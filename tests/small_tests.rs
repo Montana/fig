@@ -104,7 +104,7 @@ fn test_small_buf_equality() {
 
 #[test]
 fn test_small_buf_from_conversions() {
-    let from_vec: SmallFigBuf<32> = Vec::from(b"hello".to_vec()).into();
+    let from_vec: SmallFigBuf<32> = b"hello".to_vec().into();
     assert!(from_vec.is_inline());
     assert_eq!(&*from_vec, b"hello");
 
