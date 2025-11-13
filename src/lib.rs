@@ -350,7 +350,7 @@ mod tests {
     #[test]
     fn test_figbuf_from_static() {
         static DATA: [i32; 5] = [1, 2, 3, 4, 5];
-        let buf = FigBuf::from_static(&DATA);
+        let buf = FigBuf::<[i32]>::from_static(&DATA);
         assert_eq!(buf.len(), 5);
         assert_eq!(buf.as_slice(), &[1, 2, 3, 4, 5]);
         assert!(buf.is_static());
@@ -360,7 +360,7 @@ mod tests {
     #[test]
     fn test_figbuf_static_clone() {
         static DATA: [i32; 3] = [1, 2, 3];
-        let buf = FigBuf::from_static(&DATA);
+        let buf = FigBuf::<[i32]>::from_static(&DATA);
         let buf2 = buf.clone();
 
         assert!(buf.is_static());
@@ -372,7 +372,7 @@ mod tests {
     #[test]
     fn test_figbuf_static_slice() {
         static DATA: [i32; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-        let buf = FigBuf::from_static(&DATA);
+        let buf = FigBuf::<[i32]>::from_static(&DATA);
         let slice = buf.slice(2..7);
 
         assert_eq!(slice.as_slice(), &[2, 3, 4, 5, 6]);
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn test_figbuf_static_get_mut() {
         static DATA: [i32; 3] = [1, 2, 3];
-        let mut buf = FigBuf::from_static(&DATA);
+        let mut buf = FigBuf::<[i32]>::from_static(&DATA);
 
         // Should return None for static slices
         assert!(buf.get_mut().is_none());
@@ -391,7 +391,7 @@ mod tests {
     #[test]
     fn test_figbuf_string_from_static() {
         static TEXT: &str = "Hello, World!";
-        let buf = FigBuf::from_static(TEXT);
+        let buf = FigBuf::<str>::from_static(TEXT);
 
         assert_eq!(buf.as_str(), "Hello, World!");
         assert!(buf.is_static());
@@ -401,7 +401,7 @@ mod tests {
     #[test]
     fn test_figbuf_string_static_slice() {
         static TEXT: &str = "Hello, World!";
-        let buf = FigBuf::from_static(TEXT);
+        let buf = FigBuf::<str>::from_static(TEXT);
         let hello = buf.slice(0..5);
         let world = buf.slice(7..12);
 
@@ -467,7 +467,7 @@ mod tests {
     #[test]
     fn test_static_empty() {
         static EMPTY: [i32; 0] = [];
-        let buf = FigBuf::from_static(&EMPTY);
+        let buf = FigBuf::<[i32]>::from_static(&EMPTY);
         assert!(buf.is_empty());
         assert!(buf.is_static());
     }
