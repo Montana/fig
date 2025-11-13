@@ -306,16 +306,6 @@ impl<const N: usize> SmallFigStr<N> {
         }
     }
 
-    /// Creates a `SmallFigStr` from a string slice.
-    ///
-    /// If the string fits within `N` bytes, it's stored inline.
-    /// Otherwise, it's allocated on the heap.
-    pub fn from_str(s: &str) -> Self {
-        Self {
-            inner: SmallFigBuf::from_slice(s.as_bytes()),
-        }
-    }
-
     /// Creates a `SmallFigStr` from a static string without allocation.
     pub fn from_static(s: &'static str) -> Self {
         Self {
