@@ -5,11 +5,10 @@ use std::sync::Arc;
 pub mod bytes;
 pub mod small;
 
-/// Internal representation of the data backing a `FigBuf`.
 enum Inner<T: ?Sized + 'static> {
-    /// Static data that doesn't require reference counting.
+
     Static(&'static T),
-    /// Reference-counted data on the heap.
+
     Arc(Arc<T>),
 }
 
@@ -22,14 +21,6 @@ impl<T: ?Sized + 'static> Clone for Inner<T> {
     }
 }
 
-/// A reference-counted shared slice of generic data.
-///
-/// `FigBuf<T>` provides a way to share slices of data between multiple owners
-/// with efficient cloning and slicing operations. Similar to `Arc<[T]>` but
-/// with additional slicing capabilities that maintain shared ownership.
-///
-/// Static slices are stored without heap allocation, providing zero-cost
-/// abstraction for compile-time known data.
 pub struct FigBuf<T: ?Sized + 'static> {
     inner: Inner<T>,
     offset: usize,
@@ -37,7 +28,7 @@ pub struct FigBuf<T: ?Sized + 'static> {
 }
 
 impl<T: 'static> FigBuf<[T]> {
-    /// Creates a new `FigBuf` from a vector.
+
     pub fn from_vec(vec: Vec<T>) -> Self {
         let len = vec.len();
         Self {
@@ -47,7 +38,6 @@ impl<T: 'static> FigBuf<[T]> {
         }
     }
 
-    /// Creates a new `FigBuf` from a boxed slice.
     pub fn from_boxed_slice(slice: Box<[T]>) -> Self {
         let len = slice.len();
         Self {
@@ -57,9 +47,6 @@ impl<T: 'static> FigBuf<[T]> {
         }
     }
 
-    /// Creates a new `FigBuf` from a static slice without heap allocation.
-    ///
-    /// This is a zero-cost operation as it doesn't allocate an Arc.
     pub fn from_static(slice: &'static [T]) -> Self {
         Self {
             inner: Inner::Static(slice),
@@ -68,18 +55,14 @@ impl<T: 'static> FigBuf<[T]> {
         }
     }
 
-    /// Returns the number of elements in the slice.
     pub fn len(&self) -> usize {
         self.len
     }
 
-    /// Returns `true` if the slice has a length of 0.
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
-    /// Creates a new `FigBuf` that shares the same underlying data but
-    /// represents a subslice of the original.
     pub fn slice(&self, range: impl RangeBounds<usize>) -> Self {
         use std::ops::Bound;
 
@@ -105,7 +88,6 @@ impl<T: 'static> FigBuf<[T]> {
         }
     }
 
-    /// Returns a reference to the underlying slice.
     pub fn as_slice(&self) -> &[T] {
         let full_slice = match &self.inner {
             Inner::Static(s) => s,
@@ -114,10 +96,6 @@ impl<T: 'static> FigBuf<[T]> {
         &full_slice[self.offset..self.offset + self.len]
     }
 
-    /// Attempts to get a mutable reference to the underlying data.
-    /// Returns `Some(&mut [T])` if this is the only reference to the data.
-    ///
-    /// Note: This always returns `None` for static slices.
     pub fn get_mut(&mut self) -> Option<&mut [T]> {
         match &mut self.inner {
             Inner::Static(_) => None,
@@ -127,76 +105,30 @@ impl<T: 'static> FigBuf<[T]> {
         }
     }
 
-    /// Attempts to get a mutable reference to the underlying data.
-    /// Returns `Some(&mut [T])` if this is the only reference to the data.
-    ///
-    /// This is an alias for `get_mut()` with a more descriptive name.
-    ///
-    /// Note: This always returns `None` for static slices.
     pub fn try_mut(&mut self) -> Option<&mut [T]> {
         self.get_mut()
     }
-
-    /// Gets a mutable reference to the data, cloning if necessary (copy-on-write).
-    ///
-    /// If this `FigBuf` is the only reference to the data, returns a mutable
-    /// reference to the existing data. Otherwise, clones the data and returns
-    /// a mutable reference to the new copy.
-    ///
-    /// Note: For static slices, this will always clone the data.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use fig::FigBuf;
-    ///
-    /// let mut buf = FigBuf::from_vec(vec![1, 2, 3]);
-    /// let data = buf.make_mut();
-    /// data[0] = 10;
-    /// assert_eq!(&*buf, &[10, 2, 3]);
-    /// ```
+```
     pub fn make_mut(&mut self) -> &mut [T]
     where
         T: Clone,
     {
-        // Handle static slices - always need to clone
-        if matches!(&self.inner, Inner::Static(_)) {
+        let needs_clone = match &self.inner {
+            Inner::Static(_) => true,
+            Inner::Arc(arc) => {
+                
+                self.offset != 0 || self.len != arc.len() || Arc::strong_count(arc) > 1
+            }
+        };
+
+        if needs_clone {
             let cloned_data = self.as_slice().to_vec();
             *self = Self::from_vec(cloned_data);
-            return self.get_mut().expect("just created unique reference");
         }
 
-        // Handle Arc slices
-        // If we're not at the start of the allocation or don't span the whole thing,
-        // we need to extract our slice
-        let needs_extraction = self.offset != 0
-            || match &self.inner {
-                Inner::Arc(arc) => self.len != arc.len(),
-                Inner::Static(_) => unreachable!(),
-            };
-
-        if needs_extraction {
-            // Extract our slice into a new allocation
-            let cloned_data = self.as_slice().to_vec();
-            *self = Self::from_vec(cloned_data);
-            return self.get_mut().expect("just created unique reference");
-        }
-
-        // We own the whole Arc, try to get mutable access
-        if let Some(slice) = self.get_mut() {
-            return slice;
-        }
-
-        // Multiple references exist, need to clone
-        let cloned_data = self.as_slice().to_vec();
-        *self = Self::from_vec(cloned_data);
-        self.get_mut().expect("just created unique reference")
+        self.get_mut().expect("should have unique ownership")
     }
 
-    /// Returns the number of references to the underlying data.
-    ///
-    /// For static slices, this always returns `usize::MAX` to indicate
-    /// the data is effectively immortal.
     pub fn ref_count(&self) -> usize {
         match &self.inner {
             Inner::Static(_) => usize::MAX,
@@ -204,20 +136,17 @@ impl<T: 'static> FigBuf<[T]> {
         }
     }
 
-    /// Returns `true` if this `FigBuf` is backed by a static slice.
     pub fn is_static(&self) -> bool {
         matches!(&self.inner, Inner::Static(_))
     }
 }
 
 impl FigBuf<str> {
-    /// Creates a new `FigBuf` from a `String`.
     pub fn from_string(s: String) -> Self {
         let bytes = FigBuf::from_vec(s.into_bytes());
         Self {
             inner: match bytes.inner {
                 Inner::Arc(arc) => Inner::Arc(unsafe {
-                    // SAFETY: We know the bytes came from a valid String
                     Arc::from_raw(Arc::into_raw(arc) as *const str)
                 }),
                 Inner::Static(_) => unreachable!("from_vec never returns Static"),
@@ -227,9 +156,6 @@ impl FigBuf<str> {
         }
     }
 
-    /// Creates a new `FigBuf` from a static string without heap allocation.
-    ///
-    /// This is a zero-cost operation as it doesn't allocate an Arc.
     pub fn from_static(s: &'static str) -> Self {
         Self {
             inner: Inner::Static(s),
@@ -238,18 +164,14 @@ impl FigBuf<str> {
         }
     }
 
-    /// Returns the length of the string in bytes.
     pub fn len(&self) -> usize {
         self.len
     }
 
-    /// Returns `true` if the string has a length of 0.
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
-    /// Creates a new `FigBuf` that shares the same underlying data but
-    /// represents a substring of the original.
     pub fn slice(&self, range: impl RangeBounds<usize>) -> Self {
         use std::ops::Bound;
 
@@ -283,7 +205,6 @@ impl FigBuf<str> {
         }
     }
 
-    /// Returns a reference to the underlying string slice.
     pub fn as_str(&self) -> &str {
         let full_str = match &self.inner {
             Inner::Static(s) => s,
@@ -292,10 +213,6 @@ impl FigBuf<str> {
         &full_str[self.offset..self.offset + self.len]
     }
 
-    /// Returns the number of references to the underlying data.
-    ///
-    /// For static strings, this always returns `usize::MAX` to indicate
-    /// the data is effectively immortal.
     pub fn ref_count(&self) -> usize {
         match &self.inner {
             Inner::Static(_) => usize::MAX,
@@ -303,27 +220,11 @@ impl FigBuf<str> {
         }
     }
 
-    /// Attempts to get a mutable reference to the underlying string.
-    /// Returns `Some(&mut str)` if this is the only reference to the data.
-    ///
-    /// Note: This always returns `None` for static strings.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use fig::FigBuf;
-    ///
-    /// let mut buf = FigBuf::from_string(String::from("hello"));
-    /// if let Some(s) = buf.try_mut() {
-    ///     s.make_ascii_uppercase();
-    /// }
-    /// assert_eq!(&*buf, "HELLO");
-    /// ```
     pub fn try_mut(&mut self) -> Option<&mut str> {
         match &mut self.inner {
             Inner::Static(_) => None,
             Inner::Arc(arc) => {
-                // SAFETY: We maintain UTF-8 validity
+
                 Arc::get_mut(arc).map(|s| unsafe {
                     let bytes = s.as_bytes_mut();
                     let slice = &mut bytes[self.offset..self.offset + self.len];
@@ -333,60 +234,22 @@ impl FigBuf<str> {
         }
     }
 
-    /// Gets a mutable reference to the string, cloning if necessary (copy-on-write).
-    ///
-    /// If this `FigBuf` is the only reference to the data, returns a mutable
-    /// reference to the existing string. Otherwise, clones the data and returns
-    /// a mutable reference to the new copy.
-    ///
-    /// Note: For static strings, this will always clone the data.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use fig::FigBuf;
-    ///
-    /// let mut buf = FigBuf::from_string(String::from("hello"));
-    /// let s = buf.make_mut();
-    /// s.make_ascii_uppercase();
-    /// assert_eq!(&*buf, "HELLO");
-    /// ```
     pub fn make_mut(&mut self) -> &mut str {
-        // Handle static strings - always need to clone
-        if matches!(&self.inner, Inner::Static(_)) {
+        let needs_clone = match &self.inner {
+            Inner::Static(_) => true,
+            Inner::Arc(arc) => {
+                self.offset != 0 || self.len != arc.len() || Arc::strong_count(arc) > 1
+            }
+        };
+
+        if needs_clone {
             let cloned_data = self.as_str().to_string();
             *self = Self::from_string(cloned_data);
-            return self.try_mut().expect("just created unique reference");
         }
 
-        // Handle Arc strings
-        // If we're not at the start of the allocation or don't span the whole thing,
-        // we need to extract our slice
-        let needs_extraction = self.offset != 0
-            || match &self.inner {
-                Inner::Arc(arc) => self.len != arc.len(),
-                Inner::Static(_) => unreachable!(),
-            };
-
-        if needs_extraction {
-            // Extract our slice into a new allocation
-            let cloned_data = self.as_str().to_string();
-            *self = Self::from_string(cloned_data);
-            return self.try_mut().expect("just created unique reference");
-        }
-
-        // We own the whole Arc, try to get mutable access
-        if let Some(s) = self.try_mut() {
-            return s;
-        }
-
-        // Multiple references exist, need to clone
-        let cloned_data = self.as_str().to_string();
-        *self = Self::from_string(cloned_data);
-        self.try_mut().expect("just created unique reference")
+        self.try_mut().expect("should have unique ownership")
     }
 
-    /// Returns `true` if this `FigBuf` is backed by a static string.
     pub fn is_static(&self) -> bool {
         matches!(&self.inner, Inner::Static(_))
     }
@@ -692,7 +555,6 @@ mod tests {
         let slice = buf.make_mut();
         slice[0] = 10;
 
-        // buf should have cloned the data
         assert_eq!(&*buf, &[10, 2, 3]);
         assert_eq!(&*clone, &[1, 2, 3]);
         assert_eq!(buf.ref_count(), 1);
@@ -747,7 +609,6 @@ mod tests {
         let mut buf = FigBuf::from_string(String::from("hello"));
         let _clone = buf.clone();
 
-        // Should return None because there are multiple references
         assert!(buf.try_mut().is_none());
     }
 
@@ -769,7 +630,6 @@ mod tests {
         let s = buf.make_mut();
         s.make_ascii_uppercase();
 
-        // buf should have cloned the data
         assert_eq!(&*buf, "HELLO");
         assert_eq!(&*clone, "hello");
     }
@@ -784,7 +644,6 @@ mod tests {
         let s = buf.make_mut();
         s.make_ascii_uppercase();
 
-        // Should have cloned from static to heap
         assert_eq!(&*buf, "HELLO");
         assert!(!buf.is_static());
     }
@@ -797,7 +656,6 @@ mod tests {
         let s = hello.make_mut();
         s.make_ascii_uppercase();
 
-        // hello should have extracted its portion
         assert_eq!(&*hello, "HELLO");
         assert_eq!(&*buf, "Hello, World!");
     }
