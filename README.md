@@ -439,6 +439,12 @@ fn process_stream<R: Read>(mut reader: R) -> std::io::Result<Vec<FigBuf<[u8]>>> 
 
 ### Serialization with Serde
 
+The graph illustrates several characteristics of a sample Config structure as it moves through Serde serialization. It plots the length of the configuration’s name field, the number of tags stored in the tags vector, a mocked estimate of the total `JSON` output size in bytes, and the number of fields included in the serialized struct. 
+
+<img width="1376" height="780" alt="output (26)" src="https://github.com/user-attachments/assets/f704bd96-cfdc-467f-b673-faeccf8836fe" />
+
+The lime-green line shows how each of these values compares, while the light-green shading highlights the overall shape of the data.
+
 ```rust
 use fig::FigBuf;
 use serde::{Serialize, Deserialize};
