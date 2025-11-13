@@ -3,7 +3,7 @@ use fig::FigBuf;
 #[test]
 fn test_static_slice_basic() {
     static DATA: [i32; 5] = [1, 2, 3, 4, 5];
-    let buf = FigBuf::from_static(&DATA);
+    let buf = FigBuf::<[i32]>::from_static(&DATA);
 
     assert_eq!(buf.len(), 5);
     assert_eq!(buf[0], 1);
@@ -15,7 +15,7 @@ fn test_static_slice_basic() {
 #[test]
 fn test_static_slice_cloning() {
     static DATA: [i32; 3] = [10, 20, 30];
-    let buf1 = FigBuf::from_static(&DATA);
+    let buf1 = FigBuf::<[i32]>::from_static(&DATA);
     let buf2 = buf1.clone();
     let buf3 = buf1.clone();
 
@@ -29,7 +29,7 @@ fn test_static_slice_cloning() {
 #[test]
 fn test_static_slice_slicing() {
     static DATA: [i32; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-    let buf = FigBuf::from_static(&DATA);
+    let buf = FigBuf::<[i32]>::from_static(&DATA);
 
     let slice1 = buf.slice(2..8);
     assert_eq!(&*slice1, &[2, 3, 4, 5, 6, 7]);
@@ -43,7 +43,7 @@ fn test_static_slice_slicing() {
 #[test]
 fn test_static_string() {
     static TEXT: &str = "Hello, World!";
-    let buf = FigBuf::from_static(TEXT);
+    let buf = FigBuf::<str>::from_static(TEXT);
 
     assert_eq!(&*buf, "Hello, World!");
     assert!(buf.is_static());
@@ -56,7 +56,7 @@ fn test_static_string() {
 #[test]
 fn test_static_empty() {
     static EMPTY: [i32; 0] = [];
-    let buf = FigBuf::from_static(&EMPTY);
+    let buf = FigBuf::<[i32]>::from_static(&EMPTY);
 
     assert!(buf.is_empty());
     assert!(buf.is_static());
@@ -66,7 +66,7 @@ fn test_static_empty() {
 #[test]
 fn test_static_no_mut() {
     static DATA: [i32; 3] = [1, 2, 3];
-    let mut buf = FigBuf::from_static(&DATA);
+    let mut buf = FigBuf::<[i32]>::from_static(&DATA);
 
     // Static slices should never give mutable access
     assert!(buf.get_mut().is_none());

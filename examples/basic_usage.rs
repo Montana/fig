@@ -3,7 +3,7 @@ use fig::FigBuf;
 fn main() {
     println!("=== Static Slice Example ===");
     static STATIC_DATA: [i32; 5] = [100, 200, 300, 400, 500];
-    let static_buf = FigBuf::from_static(&STATIC_DATA);
+    let static_buf = FigBuf::<[i32]>::from_static(&STATIC_DATA);
 
     println!("Static buffer: {:?}", static_buf);
     println!("Is static: {}", static_buf.is_static());
@@ -14,7 +14,7 @@ fn main() {
     println!("Still static after slicing: {}", static_slice.is_static());
 
     static GREETING: &str = "Hello from static memory!";
-    let static_str = FigBuf::from_static(GREETING);
+    let static_str = FigBuf::<str>::from_static(GREETING);
     println!("\nStatic string: {}", static_str);
     println!("Word slice: {}", static_str.slice(0..5));
 

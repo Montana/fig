@@ -513,7 +513,7 @@ mod tests {
 
     #[test]
     fn test_small_str_inline() {
-        let s: SmallFigStr<32> = SmallFigStr::from_str("hello");
+        let s: SmallFigStr<32> = SmallFigStr::from("hello");
         assert!(s.is_inline());
         assert_eq!(&*s, "hello");
     }
@@ -521,14 +521,14 @@ mod tests {
     #[test]
     fn test_small_str_heap() {
         let long = "a".repeat(100);
-        let s: SmallFigStr<32> = SmallFigStr::from_str(&long);
+        let s: SmallFigStr<32> = SmallFigStr::from(&long[..]);
         assert!(!s.is_inline());
         assert_eq!(s.len(), 100);
     }
 
     #[test]
     fn test_small_str_slice() {
-        let s: SmallFigStr<32> = SmallFigStr::from_str("hello world");
+        let s: SmallFigStr<32> = SmallFigStr::from("hello world");
         let slice = s.slice(0..5);
         assert_eq!(&*slice, "hello");
     }
