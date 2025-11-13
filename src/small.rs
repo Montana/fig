@@ -80,7 +80,7 @@ impl<const N: usize> SmallFigBuf<N> {
     /// Creates a `SmallFigBuf` from a static slice without allocation.
     pub fn from_static(slice: &'static [u8]) -> Self {
         Self {
-            inner: SmallInner::Heap(FigBuf::from_static(slice)),
+            inner: SmallInner::Heap(FigBuf::<[u8]>::from_static(slice)),
         }
     }
 
@@ -154,7 +154,7 @@ impl<const N: usize> SmallFigBuf<N> {
         let slice_len = end - start;
 
         match &self.inner {
-            SmallInner::Inline { data, len } => {
+            SmallInner::Inline { data, len: _ } => {
                 if slice_len <= N {
                     // Keep inline
                     let mut new_data = [0; N];

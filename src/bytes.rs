@@ -2,7 +2,6 @@
 ///
 /// This module provides a `Bytes` type that wraps `FigBuf<[u8]>` and provides
 /// an API similar to the popular `bytes` crate.
-
 use crate::FigBuf;
 use std::fmt;
 use std::ops::{Deref, RangeBounds};

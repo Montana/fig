@@ -1,4 +1,4 @@
-use std::ops::{Deref, Range, RangeBounds};
+use std::ops::{Deref, RangeBounds};
 use std::sync::Arc;
 use std::fmt;
 
@@ -6,7 +6,7 @@ pub mod bytes;
 pub mod small;
 
 /// Internal representation of the data backing a `FigBuf`.
-enum Inner<T: ?Sized> {
+enum Inner<T: ?Sized + 'static> {
     /// Static data that doesn't require reference counting.
     Static(&'static T),
     /// Reference-counted data on the heap.
