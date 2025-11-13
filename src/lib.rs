@@ -108,7 +108,7 @@ impl<T: 'static> FigBuf<[T]> {
     pub fn try_mut(&mut self) -> Option<&mut [T]> {
         self.get_mut()
     }
-```
+
     pub fn make_mut(&mut self) -> &mut [T]
     where
         T: Clone,
