@@ -4,8 +4,10 @@
 //! falling back to heap storage for larger data.
 
 use crate::FigBuf;
+use std::convert::Infallible;
 use std::fmt;
 use std::ops::{Deref, RangeBounds};
+use std::str::FromStr;
 
 /// Internal representation of small buffer data.
 enum SmallInner<const N: usize> {
@@ -433,13 +435,27 @@ impl<const N: usize> PartialEq<&str> for SmallFigStr<N> {
 
 impl<const N: usize> From<&str> for SmallFigStr<N> {
     fn from(s: &str) -> Self {
-        Self::from_str(s)
+        Self {
+            inner: SmallFigBuf::from_slice(s.as_bytes()),
+        }
     }
 }
 
 impl<const N: usize> From<String> for SmallFigStr<N> {
     fn from(s: String) -> Self {
-        Self::from_str(&s)
+        Self {
+            inner: SmallFigBuf::from_slice(s.as_bytes()),
+        }
+    }
+}
+
+impl<const N: usize> FromStr for SmallFigStr<N> {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            inner: SmallFigBuf::from_slice(s.as_bytes()),
+        })
     }
 }
 
