@@ -1,4 +1,5 @@
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::ops::{Deref, RangeBounds};
 use std::sync::Arc;
 
@@ -358,6 +359,34 @@ impl<'a> From<&'a str> for FigBuf<str> {
     }
 }
 
+impl<T: Hash + 'static> Hash for FigBuf<[T]> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_slice().hash(state);
+    }
+}
+
+impl Hash for FigBuf<str> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_str().hash(state);
+    }
+}
+
+impl<T: PartialEq + 'static> PartialEq for FigBuf<[T]> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_slice() == other.as_slice()
+    }
+}
+
+impl<T: Eq + 'static> Eq for FigBuf<[T]> {}
+
+impl PartialEq for FigBuf<str> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl Eq for FigBuf<str> {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -652,5 +681,177 @@ mod tests {
 
         assert_eq!(&*hello, "HELLO");
         assert_eq!(&*buf, "Hello, World!");
+    }
+
+    #[test]
+    fn test_hash_slice() {
+        use std::collections::hash_map::DefaultHasher;
+
+        let buf1 = FigBuf::from_vec(vec![1, 2, 3, 4, 5]);
+        let buf2 = FigBuf::from_vec(vec![1, 2, 3, 4, 5]);
+        let buf3 = FigBuf::from_vec(vec![1, 2, 3, 4, 6]);
+
+        let mut hasher1 = DefaultHasher::new();
+        buf1.hash(&mut hasher1);
+        let hash1 = hasher1.finish();
+
+        let mut hasher2 = DefaultHasher::new();
+        buf2.hash(&mut hasher2);
+        let hash2 = hasher2.finish();
+
+        let mut hasher3 = DefaultHasher::new();
+        buf3.hash(&mut hasher3);
+        let hash3 = hasher3.finish();
+
+        assert_eq!(hash1, hash2);
+        assert_ne!(hash1, hash3);
+    }
+
+    #[test]
+    fn test_hash_slice_with_slicing() {
+        use std::collections::hash_map::DefaultHasher;
+
+        let buf = FigBuf::from_vec(vec![1, 2, 3, 4, 5]);
+        let slice = buf.slice(1..4);
+
+        let direct = FigBuf::from_vec(vec![2, 3, 4]);
+
+        let mut hasher1 = DefaultHasher::new();
+        slice.hash(&mut hasher1);
+        let hash1 = hasher1.finish();
+
+        let mut hasher2 = DefaultHasher::new();
+        direct.hash(&mut hasher2);
+        let hash2 = hasher2.finish();
+
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_hash_string() {
+        use std::collections::hash_map::DefaultHasher;
+
+        let buf1 = FigBuf::from_string(String::from("hello"));
+        let buf2 = FigBuf::from_string(String::from("hello"));
+        let buf3 = FigBuf::from_string(String::from("world"));
+
+        let mut hasher1 = DefaultHasher::new();
+        buf1.hash(&mut hasher1);
+        let hash1 = hasher1.finish();
+
+        let mut hasher2 = DefaultHasher::new();
+        buf2.hash(&mut hasher2);
+        let hash2 = hasher2.finish();
+
+        let mut hasher3 = DefaultHasher::new();
+        buf3.hash(&mut hasher3);
+        let hash3 = hasher3.finish();
+
+        assert_eq!(hash1, hash2);
+        assert_ne!(hash1, hash3);
+    }
+
+    #[test]
+    fn test_hash_string_with_slicing() {
+        use std::collections::hash_map::DefaultHasher;
+
+        let buf = FigBuf::from_string(String::from("Hello, World!"));
+        let slice = buf.slice(7..12);
+
+        let direct = FigBuf::from_string(String::from("World"));
+
+        let mut hasher1 = DefaultHasher::new();
+        slice.hash(&mut hasher1);
+        let hash1 = hasher1.finish();
+
+        let mut hasher2 = DefaultHasher::new();
+        direct.hash(&mut hasher2);
+        let hash2 = hasher2.finish();
+
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_hash_static() {
+        use std::collections::hash_map::DefaultHasher;
+
+        static DATA: [i32; 5] = [1, 2, 3, 4, 5];
+        let buf1 = FigBuf::<[i32]>::from_static(&DATA);
+        let buf2 = FigBuf::from_vec(vec![1, 2, 3, 4, 5]);
+
+        let mut hasher1 = DefaultHasher::new();
+        buf1.hash(&mut hasher1);
+        let hash1 = hasher1.finish();
+
+        let mut hasher2 = DefaultHasher::new();
+        buf2.hash(&mut hasher2);
+        let hash2 = hasher2.finish();
+
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_hashmap_usage() {
+        use std::collections::HashMap;
+
+        let mut map = HashMap::new();
+        let key1 = FigBuf::from_vec(vec![1, 2, 3]);
+        let key2 = FigBuf::from_vec(vec![1, 2, 3]);
+        let key3 = FigBuf::from_vec(vec![4, 5, 6]);
+
+        map.insert(key1.clone(), "first");
+        map.insert(key3.clone(), "second");
+
+        assert_eq!(map.get(&key2), Some(&"first"));
+        assert_eq!(map.get(&key1), Some(&"first"));
+        assert_eq!(map.get(&key3), Some(&"second"));
+        assert_eq!(map.len(), 2);
+    }
+
+    #[test]
+    fn test_hashmap_string_usage() {
+        use std::collections::HashMap;
+
+        let mut map = HashMap::new();
+        let key1 = FigBuf::from_string(String::from("hello"));
+        let key2 = FigBuf::from_string(String::from("hello"));
+        let key3 = FigBuf::from_string(String::from("world"));
+
+        map.insert(key1.clone(), 42);
+        map.insert(key3.clone(), 99);
+
+        assert_eq!(map.get(&key2), Some(&42));
+        assert_eq!(map.get(&key1), Some(&42));
+        assert_eq!(map.get(&key3), Some(&99));
+        assert_eq!(map.len(), 2);
+    }
+
+    #[test]
+    fn test_equality_slice() {
+        let buf1 = FigBuf::from_vec(vec![1, 2, 3]);
+        let buf2 = FigBuf::from_vec(vec![1, 2, 3]);
+        let buf3 = FigBuf::from_vec(vec![1, 2, 4]);
+
+        assert_eq!(buf1, buf2);
+        assert_ne!(buf1, buf3);
+    }
+
+    #[test]
+    fn test_equality_string() {
+        let buf1 = FigBuf::from_string(String::from("hello"));
+        let buf2 = FigBuf::from_string(String::from("hello"));
+        let buf3 = FigBuf::from_string(String::from("world"));
+
+        assert_eq!(buf1, buf2);
+        assert_ne!(buf1, buf3);
+    }
+
+    #[test]
+    fn test_equality_with_slicing() {
+        let buf = FigBuf::from_vec(vec![1, 2, 3, 4, 5]);
+        let slice = buf.slice(1..4);
+        let direct = FigBuf::from_vec(vec![2, 3, 4]);
+
+        assert_eq!(slice, direct);
     }
 }

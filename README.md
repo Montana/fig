@@ -313,6 +313,23 @@ cargo bench
 | `slice(range)`   | Substring                  |
 | `as_str()`       | Access UTF-8 string        |
 
+### Trait Implementations
+
+| Trait                | FigBuf<[T]> | FigBuf<str> | Notes                                      |
+| -------------------- | ----------- | ----------- | ------------------------------------------ |
+| `Clone`              | ✓           | ✓           | Increments reference count                 |
+| `Deref`              | ✓           | ✓           | Derefs to `[T]` or `str`                   |
+| `AsRef`              | ✓           | ✓           | Converts to `&[T]` or `&str`               |
+| `Debug`              | ✓           | ✓           | Formats underlying data                    |
+| `Display`            | ✓           | ✓           | Formats underlying data                    |
+| `Hash`               | ✓           | ✓           | Hashes content, usable as HashMap keys     |
+| `PartialEq` / `Eq`   | ✓           | ✓           | Compares content, not internal structure   |
+| `From<Vec<T>>`       | ✓           | -           | Converts from vector                       |
+| `From<Box<[T]>>`     | ✓           | -           | Converts from boxed slice                  |
+| `From<String>`       | -           | ✓           | Converts from String                       |
+| `From<&[T]>`         | ✓           | -           | Clones slice data                          |
+| `From<&str>`         | -           | ✓           | Clones string data                         |
+
 ---
 
 ## Contributions 
