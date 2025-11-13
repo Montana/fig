@@ -59,7 +59,7 @@ fn main() {
 
     println!("\n--- Long Strings (Heap) ---");
     let long = "a".repeat(100);
-    let long_str: SmallFigStr<32> = SmallFigStr::from(&long);
+    let long_str: SmallFigStr<32> = SmallFigStr::from(long.as_str());
     println!("String length: {}", long_str.len());
     println!("Is inline: {}", long_str.is_inline());
 

@@ -250,5 +250,6 @@ fn test_slice_out_of_bounds() {
 #[should_panic(expected = "slice start must be <= end")]
 fn test_slice_invalid_range() {
     let buf = FigBuf::from_vec(vec![1, 2, 3, 4, 5]);
+    #[allow(clippy::reversed_empty_ranges)]
     let _ = buf.slice(3..1);
 }
