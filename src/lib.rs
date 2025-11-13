@@ -127,6 +127,72 @@ impl<T: 'static> FigBuf<[T]> {
         }
     }
 
+    /// Attempts to get a mutable reference to the underlying data.
+    /// Returns `Some(&mut [T])` if this is the only reference to the data.
+    ///
+    /// This is an alias for `get_mut()` with a more descriptive name.
+    ///
+    /// Note: This always returns `None` for static slices.
+    pub fn try_mut(&mut self) -> Option<&mut [T]> {
+        self.get_mut()
+    }
+
+    /// Gets a mutable reference to the data, cloning if necessary (copy-on-write).
+    ///
+    /// If this `FigBuf` is the only reference to the data, returns a mutable
+    /// reference to the existing data. Otherwise, clones the data and returns
+    /// a mutable reference to the new copy.
+    ///
+    /// Note: For static slices, this will always clone the data.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use fig::FigBuf;
+    ///
+    /// let mut buf = FigBuf::from_vec(vec![1, 2, 3]);
+    /// let data = buf.make_mut();
+    /// data[0] = 10;
+    /// assert_eq!(&*buf, &[10, 2, 3]);
+    /// ```
+    pub fn make_mut(&mut self) -> &mut [T]
+    where
+        T: Clone,
+    {
+        // Handle static slices - always need to clone
+        if matches!(&self.inner, Inner::Static(_)) {
+            let cloned_data = self.as_slice().to_vec();
+            *self = Self::from_vec(cloned_data);
+            return self.get_mut().expect("just created unique reference");
+        }
+
+        // Handle Arc slices
+        // If we're not at the start of the allocation or don't span the whole thing,
+        // we need to extract our slice
+        let needs_extraction = self.offset != 0
+            || match &self.inner {
+                Inner::Arc(arc) => self.len != arc.len(),
+                Inner::Static(_) => unreachable!(),
+            };
+
+        if needs_extraction {
+            // Extract our slice into a new allocation
+            let cloned_data = self.as_slice().to_vec();
+            *self = Self::from_vec(cloned_data);
+            return self.get_mut().expect("just created unique reference");
+        }
+
+        // We own the whole Arc, try to get mutable access
+        if let Some(slice) = self.get_mut() {
+            return slice;
+        }
+
+        // Multiple references exist, need to clone
+        let cloned_data = self.as_slice().to_vec();
+        *self = Self::from_vec(cloned_data);
+        self.get_mut().expect("just created unique reference")
+    }
+
     /// Returns the number of references to the underlying data.
     ///
     /// For static slices, this always returns `usize::MAX` to indicate
@@ -235,6 +301,89 @@ impl FigBuf<str> {
             Inner::Static(_) => usize::MAX,
             Inner::Arc(arc) => Arc::strong_count(arc),
         }
+    }
+
+    /// Attempts to get a mutable reference to the underlying string.
+    /// Returns `Some(&mut str)` if this is the only reference to the data.
+    ///
+    /// Note: This always returns `None` for static strings.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use fig::FigBuf;
+    ///
+    /// let mut buf = FigBuf::from_string(String::from("hello"));
+    /// if let Some(s) = buf.try_mut() {
+    ///     s.make_ascii_uppercase();
+    /// }
+    /// assert_eq!(&*buf, "HELLO");
+    /// ```
+    pub fn try_mut(&mut self) -> Option<&mut str> {
+        match &mut self.inner {
+            Inner::Static(_) => None,
+            Inner::Arc(arc) => {
+                // SAFETY: We maintain UTF-8 validity
+                Arc::get_mut(arc).map(|s| unsafe {
+                    let bytes = s.as_bytes_mut();
+                    let slice = &mut bytes[self.offset..self.offset + self.len];
+                    std::str::from_utf8_unchecked_mut(slice)
+                })
+            }
+        }
+    }
+
+    /// Gets a mutable reference to the string, cloning if necessary (copy-on-write).
+    ///
+    /// If this `FigBuf` is the only reference to the data, returns a mutable
+    /// reference to the existing string. Otherwise, clones the data and returns
+    /// a mutable reference to the new copy.
+    ///
+    /// Note: For static strings, this will always clone the data.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use fig::FigBuf;
+    ///
+    /// let mut buf = FigBuf::from_string(String::from("hello"));
+    /// let s = buf.make_mut();
+    /// s.make_ascii_uppercase();
+    /// assert_eq!(&*buf, "HELLO");
+    /// ```
+    pub fn make_mut(&mut self) -> &mut str {
+        // Handle static strings - always need to clone
+        if matches!(&self.inner, Inner::Static(_)) {
+            let cloned_data = self.as_str().to_string();
+            *self = Self::from_string(cloned_data);
+            return self.try_mut().expect("just created unique reference");
+        }
+
+        // Handle Arc strings
+        // If we're not at the start of the allocation or don't span the whole thing,
+        // we need to extract our slice
+        let needs_extraction = self.offset != 0
+            || match &self.inner {
+                Inner::Arc(arc) => self.len != arc.len(),
+                Inner::Static(_) => unreachable!(),
+            };
+
+        if needs_extraction {
+            // Extract our slice into a new allocation
+            let cloned_data = self.as_str().to_string();
+            *self = Self::from_string(cloned_data);
+            return self.try_mut().expect("just created unique reference");
+        }
+
+        // We own the whole Arc, try to get mutable access
+        if let Some(s) = self.try_mut() {
+            return s;
+        }
+
+        // Multiple references exist, need to clone
+        let cloned_data = self.as_str().to_string();
+        *self = Self::from_string(cloned_data);
+        self.try_mut().expect("just created unique reference")
     }
 
     /// Returns `true` if this `FigBuf` is backed by a static string.
@@ -488,5 +637,168 @@ mod tests {
         let buf = FigBuf::<[i32]>::from_static(&EMPTY);
         assert!(buf.is_empty());
         assert!(buf.is_static());
+    }
+
+    #[test]
+    fn test_try_mut_unique_reference() {
+        let mut buf = FigBuf::from_vec(vec![1, 2, 3]);
+        assert_eq!(buf.ref_count(), 1);
+
+        if let Some(slice) = buf.try_mut() {
+            slice[0] = 10;
+            slice[1] = 20;
+        }
+
+        assert_eq!(&*buf, &[10, 20, 3]);
+    }
+
+    #[test]
+    fn test_try_mut_shared_reference() {
+        let mut buf = FigBuf::from_vec(vec![1, 2, 3]);
+        let _clone = buf.clone();
+
+        // Should return None because there are multiple references
+        assert!(buf.try_mut().is_none());
+    }
+
+    #[test]
+    fn test_try_mut_static() {
+        static DATA: [i32; 3] = [1, 2, 3];
+        let mut buf = FigBuf::<[i32]>::from_static(&DATA);
+
+        // Should return None for static data
+        assert!(buf.try_mut().is_none());
+    }
+
+    #[test]
+    fn test_make_mut_unique() {
+        let mut buf = FigBuf::from_vec(vec![1, 2, 3]);
+        let initial_ref_count = buf.ref_count();
+
+        let slice = buf.make_mut();
+        slice[0] = 10;
+
+        assert_eq!(&*buf, &[10, 2, 3]);
+        assert_eq!(buf.ref_count(), initial_ref_count);
+    }
+
+    #[test]
+    fn test_make_mut_shared() {
+        let mut buf = FigBuf::from_vec(vec![1, 2, 3]);
+        let clone = buf.clone();
+
+        assert_eq!(buf.ref_count(), 2);
+
+        let slice = buf.make_mut();
+        slice[0] = 10;
+
+        // buf should have cloned the data
+        assert_eq!(&*buf, &[10, 2, 3]);
+        assert_eq!(&*clone, &[1, 2, 3]);
+        assert_eq!(buf.ref_count(), 1);
+        assert_eq!(clone.ref_count(), 1);
+    }
+
+    #[test]
+    fn test_make_mut_from_static() {
+        static DATA: [i32; 3] = [1, 2, 3];
+        let mut buf = FigBuf::<[i32]>::from_static(&DATA);
+
+        assert!(buf.is_static());
+
+        let slice = buf.make_mut();
+        slice[0] = 10;
+
+        // Should have cloned from static to heap
+        assert_eq!(&*buf, &[10, 2, 3]);
+        assert!(!buf.is_static());
+        assert_eq!(buf.ref_count(), 1);
+    }
+
+    #[test]
+    fn test_make_mut_sliced_data() {
+        let mut buf = FigBuf::from_vec(vec![1, 2, 3, 4, 5]);
+        let mut slice = buf.slice(1..4);
+
+        assert_eq!(slice.ref_count(), 2);
+
+        let data = slice.make_mut();
+        data[0] = 10;
+
+        // slice should have extracted its portion
+        assert_eq!(&*slice, &[10, 3, 4]);
+        assert_eq!(&*buf, &[1, 2, 3, 4, 5]);
+        assert_eq!(slice.ref_count(), 1);
+    }
+
+    #[test]
+    fn test_string_try_mut_unique() {
+        let mut buf = FigBuf::from_string(String::from("hello"));
+
+        if let Some(s) = buf.try_mut() {
+            s.make_ascii_uppercase();
+        }
+
+        assert_eq!(&*buf, "HELLO");
+    }
+
+    #[test]
+    fn test_string_try_mut_shared() {
+        let mut buf = FigBuf::from_string(String::from("hello"));
+        let _clone = buf.clone();
+
+        // Should return None because there are multiple references
+        assert!(buf.try_mut().is_none());
+    }
+
+    #[test]
+    fn test_string_make_mut_unique() {
+        let mut buf = FigBuf::from_string(String::from("hello"));
+
+        let s = buf.make_mut();
+        s.make_ascii_uppercase();
+
+        assert_eq!(&*buf, "HELLO");
+    }
+
+    #[test]
+    fn test_string_make_mut_shared() {
+        let mut buf = FigBuf::from_string(String::from("hello"));
+        let clone = buf.clone();
+
+        let s = buf.make_mut();
+        s.make_ascii_uppercase();
+
+        // buf should have cloned the data
+        assert_eq!(&*buf, "HELLO");
+        assert_eq!(&*clone, "hello");
+    }
+
+    #[test]
+    fn test_string_make_mut_from_static() {
+        static TEXT: &str = "hello";
+        let mut buf = FigBuf::<str>::from_static(TEXT);
+
+        assert!(buf.is_static());
+
+        let s = buf.make_mut();
+        s.make_ascii_uppercase();
+
+        // Should have cloned from static to heap
+        assert_eq!(&*buf, "HELLO");
+        assert!(!buf.is_static());
+    }
+
+    #[test]
+    fn test_string_make_mut_sliced() {
+        let mut buf = FigBuf::from_string(String::from("Hello, World!"));
+        let mut hello = buf.slice(0..5);
+
+        let s = hello.make_mut();
+        s.make_ascii_uppercase();
+
+        // hello should have extracted its portion
+        assert_eq!(&*hello, "HELLO");
+        assert_eq!(&*buf, "Hello, World!");
     }
 }

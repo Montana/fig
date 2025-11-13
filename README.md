@@ -1,5 +1,7 @@
 # Fig
 
+<img width="1344" height="768" alt="I’m Under This Much Pressure (5)" src="https://github.com/user-attachments/assets/fb0ab7a4-8852-492b-98d6-98ba40e659f3" />
+
 Fig is a Rust library designed for efficient handling of shared slices with reference counting, static slice support, and small buffer optimizations. It provides a unified abstraction that allows data to be shared, sliced, and cloned with minimal overhead.
 
 ---
@@ -74,9 +76,22 @@ assert!(large.is_heap());
 | `SmallFigBuf<64>`  | Medium   | Config values, paths        |
 | `SmallFigBuf<256>` | Large    | Small JSON payloads         |
 
+
+<img width="1980" height="1180" alt="output (30)" src="https://github.com/user-attachments/assets/799053b2-7c6e-4c25-aecc-95dd7029a4f8" />
+
+This chart compares the creation time of two different buffer `types—Vec<T>` and `FigBuf` (static)—as the size of the buffer increases. The x-axis shows the buffer size in bytes (16, 32, 64, 128, 256), and the y-axis shows the time in nanoseconds it takes to create that buffer.
+
+The purple line represents the time it takes to create a standard Rust Vec<T> of the given size. As the size grows, creation time increases steadily—from about 18 ns at 16 bytes up to around 38 ns at 256 bytes. This slope makes sense because a Vec must allocate heap memory and perform initialization work proportional to the size of the buffer.
+
 ### Performance Benefits
 
 When compared to always allocating on the heap, inline storage avoids both `malloc`/`free` and pointer indirection, yielding faster cloning and improved cache locality. For workloads involving short strings or identifiers, this can significantly reduce overhead.
+
+<img width="1979" height="1180" alt="output (29)" src="https://github.com/user-attachments/assets/2befe5c3-d8eb-4722-b118-00f3c7b26ff9" />
+
+This chart illustrates how the time required to clone a heap-backed `FigBuf` changes as the number of existing clones increases. Each point on the purple line represents the measured time, in nanoseconds, to perform a single `clone()` operation when the buffer already has 1, 2, 4, 8, or 16 shared owners. 
+
+As shown in the graph, clone time increases only slightly—from about 4.8 ns to roughly 5.4 ns—as more clones exist. This small rise reflects the minimal overhead of incrementing an atomic reference count, which is the core cost of cloning a shared buffer.
 
 ---
 
@@ -93,6 +108,10 @@ The following benchmarks compare various operations across different buffer type
 | Slice operation     | 280 ns   | N/A      | 2.1 ns        | 1.8 ns          | 3.4 ns               | 14% faster  |
 | Nested slice        | N/A      | N/A      | 6.3 ns        | 5.4 ns          | 8.7 ns               | 14% faster  |
 | Deref access        | 0.4 ns   | 0.4 ns   | 0.4 ns        | 0.4 ns          | 0.4 ns               | 0%          |
+
+<img width="2374" height="1180" alt="output (32)" src="https://github.com/user-attachments/assets/fb9e780f-824c-4df4-b802-b8cd6138429c" />
+
+This graph shows the percentage improvement of Fig’s fast paths compared to the baseline implementations across several different operations. Each point corresponds to one of the benchmark categories from your performance table, and the height of the line reflects how much faster Fig is relative to the equivalent operation in `Vec<T>`, `Arc<[T]>`, or other standard structures.
 
 Static slices show extremely fast creation and cloning, inline storage eliminates allocation overhead, and heap-backed FigBuf remains competitive while supporting zero-copy slicing.
 
@@ -112,6 +131,10 @@ let slice2 = slice1.slice(1..3);
 assert_eq!(buf.ref_count(), 3);
 ```
 
+<img width="1580" height="780" alt="output (33)" src="https://github.com/user-attachments/assets/98d9ce5a-122b-4d9d-9b5b-b1439b00c06b" />
+
+The graph shows how the reference count of a `FigBuf` increases as more slices are created from it, demonstrating how nested slicing works internally. The `X-axis` represents the number of slices you create—each call to `slice()` or a nested slice on a previous slice—while the `Y-axis` shows the total reference count, which rises because every slice shares the same underlying buffer without allocating new memory.
+
 String slicing also works efficiently, with validation for UTF-8 character boundaries.
 
 ```rust
@@ -125,6 +148,43 @@ let brown = text.slice(10..15);
 ```
 
 Because slices share the underlying data, many subslices can be created without additional allocations.
+
+### Mutable Operations (Copy-on-Write)
+
+Fig supports mutable access with copy-on-write semantics through `try_mut()` and `make_mut()`.
+
+```rust
+use fig::FigBuf;
+
+// try_mut() returns Some only if uniquely owned
+
+let mut buf = FigBuf::from_vec(vec![1, 2, 3]);
+if let Some(slice) = buf.try_mut() {
+    slice[0] = 10;
+}
+assert_eq!(&*buf, &[10, 2, 3]);
+
+let mut buf1 = FigBuf::from_vec(vec![1, 2, 3]);
+let buf2 = buf1.clone();
+
+let slice = buf1.make_mut(); // clones because buf2 exists
+slice[0] = 10;
+
+assert_eq!(&*buf1, &[10, 2, 3]); 
+assert_eq!(&*buf2, &[1, 2, 3]);  
+
+String mutations are also supported:
+
+```rust
+use fig::FigBuf;
+
+let mut buf = FigBuf::from_string(String::from("hello"));
+let s = buf.make_mut();
+s.make_ascii_uppercase();
+assert_eq!(&*buf, "HELLO");
+```
+
+This enables patterns where data is mostly read-only but can be modified when needed, with automatic cloning only when multiple references exist.
 
 ---
 
@@ -208,18 +268,23 @@ cargo bench
 | `as_slice()`              | Access underlying slice                       |
 | `ref_count()`             | Arc reference count (`usize::MAX` for static) |
 | `get_mut()`               | Get mutable access if uniquely owned          |
+| `try_mut()`               | Alias for `get_mut()`                         |
+| `make_mut()`              | Get mutable access, cloning if needed (CoW)   |
 
 ### FigBuf<str>
 
-| Method           | Description            |
-| ---------------- | ---------------------- |
-| `from_string(s)` | Create from `String`   |
-| `from_static(s)` | Create from static str |
-| `len()`          | Byte length            |
-| `is_empty()`     | Check if empty         |
-| `is_static()`    | Backed by static data  |
-| `slice(range)`   | Create substring       |
-| `as_str()`       | Access underlying str  |
+| Method           | Description                                 |
+| ---------------- | ------------------------------------------- |
+| `from_string(s)` | Create from `String`                        |
+| `from_static(s)` | Create from static str                      |
+| `len()`          | Byte length                                 |
+| `is_empty()`     | Check if empty                              |
+| `is_static()`    | Backed by static data                       |
+| `slice(range)`   | Create substring                            |
+| `as_str()`       | Access underlying str                       |
+| `ref_count()`    | Arc reference count (`usize::MAX` for static) |
+| `try_mut()`      | Get mutable access if uniquely owned        |
+| `make_mut()`     | Get mutable access, cloning if needed (CoW) |
 
 ### SmallFigBuf<N>
 
@@ -249,6 +314,10 @@ cargo bench
 | `as_str()`       | Access UTF-8 string        |
 
 ---
+
+## Contributions 
+
+Contributions are generally welcomed. As I've made Fig, GPL. 
 
 ## Author
 
