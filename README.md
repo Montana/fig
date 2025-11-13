@@ -179,7 +179,8 @@ let slice = buf1.make_mut(); // clones because buf2 exists
 slice[0] = 10;
 
 assert_eq!(&*buf1, &[10, 2, 3]); 
-assert_eq!(&*buf2, &[1, 2, 3]);  
+assert_eq!(&*buf2, &[1, 2, 3]);
+```
 
 String mutations are also supported:
 
