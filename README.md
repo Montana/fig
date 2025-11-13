@@ -186,6 +186,76 @@ assert_eq!(&*buf, "HELLO");
 
 This enables patterns where data is mostly read-only but can be modified when needed, with automatic cloning only when multiple references exist.
 
+### I/O Operations
+
+FigBuf implements standard I/O traits for seamless integration with Rust's I/O ecosystem.
+
+```rust
+use fig::FigBuf;
+use std::io::{Read, Write};
+
+let mut reader = FigBuf::from_vec(vec![1, 2, 3, 4, 5]);
+let mut output = [0u8; 3];
+
+reader.read(&mut output).unwrap();
+assert_eq!(output, [1, 2, 3]);
+assert_eq!(reader.as_slice(), &[4, 5]);
+```
+
+```rust
+use fig::FigBuf;
+use std::io::Write;
+
+let mut writer = FigBuf::from_vec(vec![0u8; 5]);
+writer.write(&[1, 2, 3]).unwrap();
+assert_eq!(writer.as_slice(), &[1, 2, 3, 0, 0]);
+```
+
+### HashMap and HashSet Usage
+
+FigBuf can be used as keys in HashMap and HashSet due to Hash and Eq implementations.
+
+```rust
+use fig::FigBuf;
+use std::collections::HashMap;
+
+let mut cache = HashMap::new();
+let key1 = FigBuf::from_vec(vec![1, 2, 3]);
+let key2 = FigBuf::from_vec(vec![1, 2, 3]);
+
+cache.insert(key1.clone(), "cached data");
+
+assert_eq!(cache.get(&key2), Some(&"cached data"));
+```
+
+```rust
+use fig::FigBuf;
+use std::collections::HashMap;
+
+let mut map = HashMap::new();
+map.insert(FigBuf::from_string(String::from("hello")), 42);
+
+let lookup = FigBuf::from_string(String::from("hello"));
+assert_eq!(map.get(&lookup), Some(&42));
+```
+
+### Borrow Trait Interop
+
+FigBuf implements Borrow for seamless interaction with standard collections.
+
+```rust
+use fig::FigBuf;
+use std::collections::HashMap;
+use std::borrow::Borrow;
+
+let mut map: HashMap<Vec<u8>, &str> = HashMap::new();
+map.insert(vec![1, 2, 3], "data");
+
+let buf = FigBuf::from_vec(vec![1, 2, 3]);
+let borrowed: &[u8] = buf.borrow();
+assert_eq!(map.get(borrowed), Some(&"data"));
+```
+
 ---
 
 ## Architecture
@@ -252,7 +322,122 @@ cargo bench
 
 ---
 
+## Practical Examples
+
+### Network Protocol Parser
+
+```rust
+use fig::FigBuf;
+
+fn parse_http_header(data: FigBuf<[u8]>) -> (FigBuf<[u8]>, FigBuf<[u8]>) {
+    let header_end = data.as_slice()
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .unwrap_or(data.len());
+
+    let headers = data.slice(0..header_end);
+    let body = data.slice(header_end..);
+
+    (headers, body)
+}
+
+let request = FigBuf::from_vec(b"GET / HTTP/1.1\r\n\r\nBody".to_vec());
+let (headers, body) = parse_http_header(request);
+```
+
+### Configuration Cache
+
+```rust
+use fig::FigBuf;
+use std::collections::HashMap;
+
+struct ConfigCache {
+    cache: HashMap<FigBuf<str>, FigBuf<str>>,
+}
+
+impl ConfigCache {
+    fn new() -> Self {
+        Self {
+            cache: HashMap::new(),
+        }
+    }
+
+    fn get(&self, key: &str) -> Option<&FigBuf<str>> {
+        let lookup = FigBuf::from_string(key.to_string());
+        self.cache.get(&lookup)
+    }
+
+    fn insert(&mut self, key: String, value: String) {
+        self.cache.insert(
+            FigBuf::from_string(key),
+            FigBuf::from_string(value)
+        );
+    }
+}
+```
+
+### Zero-Copy Log Processing
+
+```rust
+use fig::FigBuf;
+
+fn extract_log_fields(log_line: FigBuf<str>) -> Vec<FigBuf<str>> {
+    let mut fields = Vec::new();
+    let mut start = 0;
+
+    for (i, ch) in log_line.as_str().char_indices() {
+        if ch == '|' {
+            fields.push(log_line.slice(start..i));
+            start = i + 1;
+        }
+    }
+
+    if start < log_line.len() {
+        fields.push(log_line.slice(start..));
+    }
+
+    fields
+}
+
+static LOG: &str = "2025-01-01|INFO|Application started|main.rs";
+let log = FigBuf::from_static(LOG);
+let fields = extract_log_fields(log);
+```
+
+### Buffer Pool Pattern
+
+```rust
+use fig::FigBuf;
+use std::io::{Read, Write};
+
+fn process_stream<R: Read>(mut reader: R) -> std::io::Result<Vec<FigBuf<[u8]>>> {
+    let mut chunks = Vec::new();
+    let mut buffer = vec![0u8; 4096];
+
+    loop {
+        let n = reader.read(&mut buffer)?;
+        if n == 0 {
+            break;
+        }
+
+        let chunk = FigBuf::from_vec(buffer[..n].to_vec());
+        chunks.push(chunk);
+    }
+
+    Ok(chunks)
+}
+```
+
+---
+
 ## API Reference
+
+Below the graph is showing how large each API surface is for the four Fig/SmallFig buffer types:
+
+<img width="1967" height="1180" alt="output (25)" src="https://github.com/user-attachments/assets/51473370-875d-4797-9974-4a627769ce6e" />
+
+Each buffer type (`FigBuf<[T]>`, `FigBuf`, `SmallFigBuf`, `SmallFigStr`) has a different number of methods you can call on it. The chart visualizes how many methods each one exposes. Please look at the table below for all methods: 
+
 
 ### FigBuf<[T]>
 
@@ -315,20 +500,23 @@ cargo bench
 
 ### Trait Implementations
 
-| Trait                | FigBuf<[T]> | FigBuf<str> | Notes                                      |
-| -------------------- | ----------- | ----------- | ------------------------------------------ |
-| `Clone`              | ✓           | ✓           | Increments reference count                 |
-| `Deref`              | ✓           | ✓           | Derefs to `[T]` or `str`                   |
-| `AsRef`              | ✓           | ✓           | Converts to `&[T]` or `&str`               |
-| `Debug`              | ✓           | ✓           | Formats underlying data                    |
-| `Display`            | ✓           | ✓           | Formats underlying data                    |
-| `Hash`               | ✓           | ✓           | Hashes content, usable as HashMap keys     |
-| `PartialEq` / `Eq`   | ✓           | ✓           | Compares content, not internal structure   |
-| `From<Vec<T>>`       | ✓           | -           | Converts from vector                       |
-| `From<Box<[T]>>`     | ✓           | -           | Converts from boxed slice                  |
-| `From<String>`       | -           | ✓           | Converts from String                       |
-| `From<&[T]>`         | ✓           | -           | Clones slice data                          |
-| `From<&str>`         | -           | ✓           | Clones string data                         |
+| Trait                | FigBuf<[T]> | FigBuf<str> | FigBuf<[u8]> | Notes                                        |
+| -------------------- | ----------- | ----------- | ------------ | -------------------------------------------- |
+| `Clone`              | ✓           | ✓           | ✓            | Increments reference count                   |
+| `Deref`              | ✓           | ✓           | ✓            | Derefs to `[T]` or `str`                     |
+| `AsRef`              | ✓           | ✓           | ✓            | Converts to `&[T]` or `&str`                 |
+| `Borrow`             | ✓           | ✓           | ✓            | Enables HashMap lookups with slices          |
+| `Debug`              | ✓           | ✓           | ✓            | Formats underlying data                      |
+| `Display`            | ✓           | ✓           | ✓            | Formats underlying data                      |
+| `Hash`               | ✓           | ✓           | ✓            | Hashes content, usable as HashMap keys       |
+| `PartialEq` / `Eq`   | ✓           | ✓           | ✓            | Compares content, not internal structure     |
+| `Read`               | -           | -           | ✓            | Implements std::io::Read for byte buffers    |
+| `Write`              | -           | -           | ✓            | Implements std::io::Write for byte buffers   |
+| `From<Vec<T>>`       | ✓           | -           | ✓            | Converts from vector                         |
+| `From<Box<[T]>>`     | ✓           | -           | ✓            | Converts from boxed slice                    |
+| `From<String>`       | -           | ✓           | -            | Converts from String                         |
+| `From<&[T]>`         | ✓           | -           | ✓            | Clones slice data                            |
+| `From<&str>`         | -           | ✓           | -            | Clones string data                           |
 
 ---
 

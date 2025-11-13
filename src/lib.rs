@@ -1,5 +1,7 @@
+use std::borrow::Borrow;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::io::{self, Read, Write};
 use std::ops::{Deref, RangeBounds};
 use std::sync::Arc;
 
@@ -386,6 +388,56 @@ impl PartialEq for FigBuf<str> {
 }
 
 impl Eq for FigBuf<str> {}
+
+impl<T: 'static> Borrow<[T]> for FigBuf<[T]> {
+    fn borrow(&self) -> &[T] {
+        self.as_slice()
+    }
+}
+
+impl Borrow<str> for FigBuf<str> {
+    fn borrow(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Read for FigBuf<[u8]> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let data = self.as_slice();
+        let len = std::cmp::min(buf.len(), data.len());
+        buf[..len].copy_from_slice(&data[..len]);
+        *self = self.slice(len..);
+        Ok(len)
+    }
+}
+
+impl Write for FigBuf<[u8]> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let available = self.len();
+        if available == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::WriteZero,
+                "buffer is full or empty",
+            ));
+        }
+
+        let to_write = std::cmp::min(buf.len(), available);
+
+        if let Some(slice) = self.try_mut() {
+            slice[..to_write].copy_from_slice(&buf[..to_write]);
+            Ok(to_write)
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "buffer is not uniquely owned",
+            ))
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -853,5 +905,121 @@ mod tests {
         let direct = FigBuf::from_vec(vec![2, 3, 4]);
 
         assert_eq!(slice, direct);
+    }
+
+    #[test]
+    fn test_borrow_slice() {
+        use std::collections::HashMap;
+
+        let mut map: HashMap<Vec<i32>, &str> = HashMap::new();
+        map.insert(vec![1, 2, 3], "test");
+
+        let buf = FigBuf::from_vec(vec![1, 2, 3]);
+        let borrowed: &[i32] = buf.borrow();
+        assert_eq!(map.get(borrowed), Some(&"test"));
+    }
+
+    #[test]
+    fn test_borrow_str() {
+        use std::collections::HashMap;
+
+        let mut map: HashMap<String, i32> = HashMap::new();
+        map.insert(String::from("hello"), 42);
+
+        let buf = FigBuf::from_string(String::from("hello"));
+        let borrowed: &str = buf.borrow();
+        assert_eq!(map.get(borrowed), Some(&42));
+    }
+
+    #[test]
+    fn test_read_trait() {
+        use std::io::Read;
+
+        let mut buf = FigBuf::from_vec(vec![1, 2, 3, 4, 5]);
+        let mut output = [0u8; 3];
+
+        let bytes_read = buf.read(&mut output).unwrap();
+        assert_eq!(bytes_read, 3);
+        assert_eq!(output, [1, 2, 3]);
+        assert_eq!(buf.as_slice(), &[4, 5]);
+    }
+
+    #[test]
+    fn test_read_trait_partial() {
+        use std::io::Read;
+
+        let mut buf = FigBuf::from_vec(vec![1, 2, 3]);
+        let mut output = [0u8; 5];
+
+        let bytes_read = buf.read(&mut output).unwrap();
+        assert_eq!(bytes_read, 3);
+        assert_eq!(&output[..3], &[1, 2, 3]);
+        assert_eq!(buf.len(), 0);
+    }
+
+    #[test]
+    fn test_read_trait_multiple_reads() {
+        use std::io::Read;
+
+        let mut buf = FigBuf::from_vec(vec![1, 2, 3, 4, 5, 6, 7, 8]);
+        let mut output1 = [0u8; 3];
+        let mut output2 = [0u8; 3];
+        let mut output3 = [0u8; 3];
+
+        assert_eq!(buf.read(&mut output1).unwrap(), 3);
+        assert_eq!(output1, [1, 2, 3]);
+
+        assert_eq!(buf.read(&mut output2).unwrap(), 3);
+        assert_eq!(output2, [4, 5, 6]);
+
+        assert_eq!(buf.read(&mut output3).unwrap(), 2);
+        assert_eq!(&output3[..2], &[7, 8]);
+    }
+
+    #[test]
+    fn test_write_trait() {
+        use std::io::Write;
+
+        let mut buf = FigBuf::from_vec(vec![0u8; 5]);
+        let data = [1, 2, 3];
+
+        let bytes_written = buf.write(&data).unwrap();
+        assert_eq!(bytes_written, 3);
+        assert_eq!(buf.as_slice(), &[1, 2, 3, 0, 0]);
+    }
+
+    #[test]
+    fn test_write_trait_partial() {
+        use std::io::Write;
+
+        let mut buf = FigBuf::from_vec(vec![0u8; 3]);
+        let data = [1, 2, 3, 4, 5];
+
+        let bytes_written = buf.write(&data).unwrap();
+        assert_eq!(bytes_written, 3);
+        assert_eq!(buf.as_slice(), &[1, 2, 3]);
+    }
+
+    #[test]
+    fn test_write_trait_shared_fails() {
+        use std::io::Write;
+
+        let mut buf = FigBuf::from_vec(vec![0u8; 5]);
+        let _clone = buf.clone();
+        let data = [1, 2, 3];
+
+        let result = buf.write(&data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_write_trait_empty_fails() {
+        use std::io::Write;
+
+        let mut buf = FigBuf::from_vec(vec![]);
+        let data = [1, 2, 3];
+
+        let result = buf.write(&data);
+        assert!(result.is_err());
     }
 }
