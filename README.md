@@ -37,6 +37,14 @@ assert_eq!(static_buf.ref_count(), usize::MAX);
 
 Fig supports generic slice types such as `FigBuf<[T]>` and offers first-class string handling through `FigBuf<str>`. All heap-backed operations rely on thread-safe `Arc` storage. Static slice support allows compile-time data to be referenced without any allocation. For small data, Fig can store content inline using the `SmallFigBuf<N>` and `SmallFigStr<N>` types, which avoid heap use until necessary. Slicing operations create shared subslices without copying data, allowing complex nested slicing patterns to be constructed efficiently.
 
+### Optional Features
+
+Fig provides optional features that can be enabled via Cargo:
+
+| Feature | Description                                    | Usage                                   |
+| ------- | ---------------------------------------------- | --------------------------------------- |
+| `serde` | Enable serialization/deserialization support   | `fig = { version = "0.1", features = ["serde"] }` |
+
 ---
 
 ## Storage Strategies
@@ -428,6 +436,32 @@ fn process_stream<R: Read>(mut reader: R) -> std::io::Result<Vec<FigBuf<[u8]>>> 
 }
 ```
 
+### Serialization with Serde
+
+```rust
+use fig::FigBuf;
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize)]
+struct Config {
+    name: FigBuf<str>,
+    tags: FigBuf<[String]>,
+}
+
+let config = Config {
+    name: FigBuf::from_string(String::from("production")),
+    tags: FigBuf::from_vec(vec![
+        String::from("server"),
+        String::from("database")
+    ]),
+};
+
+let json = serde_json::to_string(&config).unwrap();
+let restored: Config = serde_json::from_str(&json).unwrap();
+
+assert_eq!(config.name.as_str(), restored.name.as_str());
+```
+
 ---
 
 ## API Reference
@@ -500,23 +534,27 @@ Each buffer type (`FigBuf<[T]>`, `FigBuf`, `SmallFigBuf`, `SmallFigStr`) has a d
 
 ### Trait Implementations
 
-| Trait                | FigBuf<[T]> | FigBuf<str> | FigBuf<[u8]> | Notes                                        |
-| -------------------- | ----------- | ----------- | ------------ | -------------------------------------------- |
-| `Clone`              | ✓           | ✓           | ✓            | Increments reference count                   |
-| `Deref`              | ✓           | ✓           | ✓            | Derefs to `[T]` or `str`                     |
-| `AsRef`              | ✓           | ✓           | ✓            | Converts to `&[T]` or `&str`                 |
-| `Borrow`             | ✓           | ✓           | ✓            | Enables HashMap lookups with slices          |
-| `Debug`              | ✓           | ✓           | ✓            | Formats underlying data                      |
-| `Display`            | ✓           | ✓           | ✓            | Formats underlying data                      |
-| `Hash`               | ✓           | ✓           | ✓            | Hashes content, usable as HashMap keys       |
-| `PartialEq` / `Eq`   | ✓           | ✓           | ✓            | Compares content, not internal structure     |
-| `Read`               | -           | -           | ✓            | Implements std::io::Read for byte buffers    |
-| `Write`              | -           | -           | ✓            | Implements std::io::Write for byte buffers   |
-| `From<Vec<T>>`       | ✓           | -           | ✓            | Converts from vector                         |
-| `From<Box<[T]>>`     | ✓           | -           | ✓            | Converts from boxed slice                    |
-| `From<String>`       | -           | ✓           | -            | Converts from String                         |
-| `From<&[T]>`         | ✓           | -           | ✓            | Clones slice data                            |
-| `From<&str>`         | -           | ✓           | -            | Clones string data                           |
+| Trait                   | FigBuf<[T]> | FigBuf<str> | FigBuf<[u8]> | Notes                                        |
+| ----------------------- | ----------- | ----------- | ------------ | -------------------------------------------- |
+| `Clone`                 | ✓           | ✓           | ✓            | Increments reference count                   |
+| `Deref`                 | ✓           | ✓           | ✓            | Derefs to `[T]` or `str`                     |
+| `AsRef`                 | ✓           | ✓           | ✓            | Converts to `&[T]` or `&str`                 |
+| `Borrow`                | ✓           | ✓           | ✓            | Enables HashMap lookups with slices          |
+| `Debug`                 | ✓           | ✓           | ✓            | Formats underlying data                      |
+| `Display`               | ✓           | ✓           | ✓            | Formats underlying data                      |
+| `Hash`                  | ✓           | ✓           | ✓            | Hashes content, usable as HashMap keys       |
+| `PartialEq` / `Eq`      | ✓           | ✓           | ✓            | Compares content, not internal structure     |
+| `Read`                  | -           | -           | ✓            | Implements std::io::Read for byte buffers    |
+| `Write`                 | -           | -           | ✓            | Implements std::io::Write for byte buffers   |
+| `Serialize`*            | ✓           | ✓           | ✓            | Serde serialization (requires `serde` feature) |
+| `Deserialize`*          | ✓           | ✓           | ✓            | Serde deserialization (requires `serde` feature) |
+| `From<Vec<T>>`          | ✓           | -           | ✓            | Converts from vector                         |
+| `From<Box<[T]>>`        | ✓           | -           | ✓            | Converts from boxed slice                    |
+| `From<String>`          | -           | ✓           | -            | Converts from String                         |
+| `From<&[T]>`            | ✓           | -           | ✓            | Clones slice data                            |
+| `From<&str>`            | -           | ✓           | -            | Clones string data                           |
+
+*Requires the `serde` feature flag to be enabled.
 
 ---
 

@@ -439,6 +439,56 @@ impl Write for FigBuf<[u8]> {
     }
 }
 
+#[cfg(feature = "serde")]
+mod serde_impl {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    impl<T> Serialize for FigBuf<[T]>
+    where
+        T: Serialize + 'static,
+    {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            self.as_slice().serialize(serializer)
+        }
+    }
+
+    impl<'de, T> Deserialize<'de> for FigBuf<[T]>
+    where
+        T: Deserialize<'de> + 'static,
+    {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let vec = Vec::<T>::deserialize(deserializer)?;
+            Ok(FigBuf::from_vec(vec))
+        }
+    }
+
+    impl Serialize for FigBuf<str> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            self.as_str().serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for FigBuf<str> {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let s = String::deserialize(deserializer)?;
+            Ok(FigBuf::from_string(s))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1021,5 +1071,127 @@ mod tests {
 
         let result = buf.write(&data);
         assert!(result.is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serialize_slice() {
+        let buf = FigBuf::from_vec(vec![1, 2, 3, 4, 5]);
+        let json = serde_json::to_string(&buf).unwrap();
+        assert_eq!(json, "[1,2,3,4,5]");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_deserialize_slice() {
+        let json = "[1,2,3,4,5]";
+        let buf: FigBuf<[i32]> = serde_json::from_str(json).unwrap();
+        assert_eq!(buf.as_slice(), &[1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serialize_deserialize_slice_roundtrip() {
+        let original = FigBuf::from_vec(vec![10, 20, 30, 40, 50]);
+        let json = serde_json::to_string(&original).unwrap();
+        let deserialized: FigBuf<[i32]> = serde_json::from_str(&json).unwrap();
+        assert_eq!(original.as_slice(), deserialized.as_slice());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serialize_string() {
+        let buf = FigBuf::from_string(String::from("hello world"));
+        let json = serde_json::to_string(&buf).unwrap();
+        assert_eq!(json, "\"hello world\"");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_deserialize_string() {
+        let json = "\"hello world\"";
+        let buf: FigBuf<str> = serde_json::from_str(json).unwrap();
+        assert_eq!(buf.as_str(), "hello world");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serialize_deserialize_string_roundtrip() {
+        let original = FigBuf::from_string(String::from("The quick brown fox"));
+        let json = serde_json::to_string(&original).unwrap();
+        let deserialized: FigBuf<str> = serde_json::from_str(&json).unwrap();
+        assert_eq!(original.as_str(), deserialized.as_str());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serialize_static_slice() {
+        static DATA: [i32; 5] = [1, 2, 3, 4, 5];
+        let buf = FigBuf::<[i32]>::from_static(&DATA);
+        let json = serde_json::to_string(&buf).unwrap();
+        assert_eq!(json, "[1,2,3,4,5]");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serialize_static_string() {
+        static TEXT: &str = "static text";
+        let buf = FigBuf::<str>::from_static(TEXT);
+        let json = serde_json::to_string(&buf).unwrap();
+        assert_eq!(json, "\"static text\"");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serialize_sliced_buffer() {
+        let buf = FigBuf::from_vec(vec![1, 2, 3, 4, 5, 6, 7, 8]);
+        let slice = buf.slice(2..6);
+        let json = serde_json::to_string(&slice).unwrap();
+        assert_eq!(json, "[3,4,5,6]");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serialize_nested_struct() {
+        #[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
+        struct Container {
+            name: FigBuf<str>,
+            data: FigBuf<[i32]>,
+        }
+
+        let container = Container {
+            name: FigBuf::from_string(String::from("test")),
+            data: FigBuf::from_vec(vec![1, 2, 3]),
+        };
+
+        let json = serde_json::to_string(&container).unwrap();
+        let deserialized: Container = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(container.name.as_str(), deserialized.name.as_str());
+        assert_eq!(container.data.as_slice(), deserialized.data.as_slice());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serialize_empty_slice() {
+        let buf = FigBuf::from_vec(Vec::<i32>::new());
+        let json = serde_json::to_string(&buf).unwrap();
+        assert_eq!(json, "[]");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serialize_empty_string() {
+        let buf = FigBuf::from_string(String::new());
+        let json = serde_json::to_string(&buf).unwrap();
+        assert_eq!(json, "\"\"");
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serialize_bytes() {
+        let buf = FigBuf::from_vec(vec![0u8, 1u8, 2u8, 255u8]);
+        let json = serde_json::to_string(&buf).unwrap();
+        assert_eq!(json, "[0,1,2,255]");
     }
 }

@@ -11,10 +11,16 @@ keywords = [
   "io",
 ]
 
+[features]
+default = []
+serde = ["dep:serde"]
+
 [dependencies]
+serde = { version = "1.0", optional = true, features = ["derive"] }
 
 [dev-dependencies]
 criterion = "0.5"
+serde_json = "1.0"
 
 [[bench]]
 name = "figbuf_bench"
