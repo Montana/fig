@@ -579,7 +579,7 @@ mod tests {
 
     #[test]
     fn test_make_mut_sliced_data() {
-        let mut buf = FigBuf::from_vec(vec![1, 2, 3, 4, 5]);
+        let buf = FigBuf::from_vec(vec![1, 2, 3, 4, 5]);
         let mut slice = buf.slice(1..4);
 
         assert_eq!(slice.ref_count(), 2);
@@ -650,7 +650,7 @@ mod tests {
 
     #[test]
     fn test_string_make_mut_sliced() {
-        let mut buf = FigBuf::from_string(String::from("Hello, World!"));
+        let buf = FigBuf::from_string(String::from("Hello, World!"));
         let mut hello = buf.slice(0..5);
 
         let s = hello.make_mut();
