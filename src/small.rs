@@ -12,10 +12,7 @@ use std::str::FromStr;
 /// Internal representation of small buffer data.
 enum SmallInner<const N: usize> {
     /// Data stored inline within the struct (no heap allocation).
-    Inline {
-        data: [u8; N],
-        len: usize,
-    },
+    Inline { data: [u8; N], len: usize },
     /// Data stored on the heap via FigBuf.
     Heap(FigBuf<[u8]>),
 }
@@ -356,8 +353,14 @@ impl<const N: usize> SmallFigStr<N> {
             Bound::Unbounded => self.len(),
         };
 
-        assert!(self.as_str().is_char_boundary(start), "slice start not at char boundary");
-        assert!(self.as_str().is_char_boundary(end), "slice end not at char boundary");
+        assert!(
+            self.as_str().is_char_boundary(start),
+            "slice start not at char boundary"
+        );
+        assert!(
+            self.as_str().is_char_boundary(end),
+            "slice end not at char boundary"
+        );
 
         Self {
             inner: self.inner.slice(start..end),

@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use fig::FigBuf;
 use std::sync::Arc;
 
@@ -6,13 +6,17 @@ fn bench_creation(c: &mut Criterion) {
     let mut group = c.benchmark_group("creation");
 
     for size in [100, 1000, 10000] {
-        group.bench_with_input(BenchmarkId::new("figbuf_from_vec", size), &size, |b, &size| {
-            let data: Vec<u64> = (0..size).collect();
-            b.iter(|| {
-                let buf = FigBuf::from_vec(black_box(data.clone()));
-                black_box(buf)
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("figbuf_from_vec", size),
+            &size,
+            |b, &size| {
+                let data: Vec<u64> = (0..size).collect();
+                b.iter(|| {
+                    let buf = FigBuf::from_vec(black_box(data.clone()));
+                    black_box(buf)
+                });
+            },
+        );
 
         group.bench_with_input(BenchmarkId::new("arc_from_vec", size), &size, |b, &size| {
             let data: Vec<u64> = (0..size).collect();

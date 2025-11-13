@@ -22,7 +22,6 @@ fn test_small_buf_heap_storage() {
 
 #[test]
 fn test_small_buf_capacity_boundary() {
-
     let buf_at: SmallFigBuf<16> = SmallFigBuf::from_slice(&[0; 16]);
     assert!(buf_at.is_inline());
 
@@ -133,7 +132,6 @@ fn test_small_buf_into_figbuf() {
     assert_eq!(&*figbuf, b"test");
 }
 
-
 #[test]
 fn test_small_str_inline() {
     let s: SmallFigStr<32> = SmallFigStr::from("hello world");
@@ -188,7 +186,7 @@ fn test_small_str_slice_unicode() {
 #[should_panic(expected = "slice start not at char boundary")]
 fn test_small_str_invalid_boundary() {
     let s: SmallFigStr<32> = SmallFigStr::from("世界");
-    let _ = s.slice(1..3); 
+    let _ = s.slice(1..3);
 }
 
 #[test]
@@ -263,7 +261,6 @@ fn test_inline_capacity() {
 
 #[test]
 fn test_zero_capacity() {
-
     let buf: SmallFigBuf<0> = SmallFigBuf::from_slice(b"test");
     assert!(buf.is_heap());
     assert_eq!(&*buf, b"test");

@@ -7,7 +7,10 @@ fn main() {
 
     println!("Static buffer: {:?}", static_buf);
     println!("Is static: {}", static_buf.is_static());
-    println!("Reference count: {} (usize::MAX means static)", static_buf.ref_count());
+    println!(
+        "Reference count: {} (usize::MAX means static)",
+        static_buf.ref_count()
+    );
 
     let static_slice = static_buf.slice(1..4);
     println!("Static slice: {:?}", static_slice);
@@ -38,7 +41,10 @@ fn main() {
     println!("\nReference count after cloning: {}", buf.ref_count());
 
     let nested = slice1.slice(1..4);
-    println!("\nNested slice (elements 1-3 from first slice): {:?}", nested);
+    println!(
+        "\nNested slice (elements 1-3 from first slice): {:?}",
+        nested
+    );
 
     let text = String::from("Hello, Rust World!");
     let str_buf = FigBuf::from_string(text);

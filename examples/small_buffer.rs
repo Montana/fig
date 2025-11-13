@@ -37,7 +37,10 @@ fn main() {
 
     let one_more = vec![1u8; 33];
     let over_capacity: SmallFigBuf<32> = SmallFigBuf::from_vec(one_more);
-    println!("33 bytes (one over) - is inline: {}", over_capacity.is_inline());
+    println!(
+        "33 bytes (one over) - is inline: {}",
+        over_capacity.is_inline()
+    );
 
     println!("\n=== SmallFigStr Examples ===\n");
 
@@ -112,8 +115,7 @@ fn main() {
         std::mem::size_of::<Vec<u8>>()
     );
 
-    println!(
-        "\nWith SmallFigBuf<32>, strings up to 32 bytes require:");
+    println!("\nWith SmallFigBuf<32>, strings up to 32 bytes require:");
     println!("  - No heap allocation");
     println!("  - No pointer chasing");
     println!("  - Better cache locality");

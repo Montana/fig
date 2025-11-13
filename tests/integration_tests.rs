@@ -172,7 +172,6 @@ fn test_deeply_nested_slicing() {
 
 #[test]
 fn test_conversions() {
-
     let buf1: FigBuf<[i32]> = vec![1, 2, 3].into();
     assert_eq!(&*buf1, &[1, 2, 3]);
 
@@ -200,9 +199,7 @@ fn test_deref_coercion() {
 fn test_multiple_slices_from_same_source() {
     let buf = FigBuf::from_vec((0..20).collect::<Vec<_>>());
 
-    let slices: Vec<_> = (0..5)
-        .map(|i| buf.slice(i * 4..(i + 1) * 4))
-        .collect();
+    let slices: Vec<_> = (0..5).map(|i| buf.slice(i * 4..(i + 1) * 4)).collect();
 
     assert_eq!(&*slices[0], &[0, 1, 2, 3]);
     assert_eq!(&*slices[1], &[4, 5, 6, 7]);

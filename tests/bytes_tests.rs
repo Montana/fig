@@ -160,9 +160,7 @@ fn test_bytes_split_operations_preserve_data() {
 fn test_bytes_multiple_slices() {
     let bytes = Bytes::from_vec((0..100).collect());
 
-    let slices: Vec<_> = (0..10)
-        .map(|i| bytes.slice(i * 10..(i + 1) * 10))
-        .collect();
+    let slices: Vec<_> = (0..10).map(|i| bytes.slice(i * 10..(i + 1) * 10)).collect();
 
     for (i, slice) in slices.iter().enumerate() {
         let expected: Vec<u8> = ((i * 10)..(i + 1) * 10).map(|x| x as u8).collect();

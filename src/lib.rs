@@ -1,6 +1,6 @@
+use std::fmt;
 use std::ops::{Deref, RangeBounds};
 use std::sync::Arc;
-use std::fmt;
 
 pub mod bytes;
 pub mod small;
@@ -121,8 +121,9 @@ impl<T: 'static> FigBuf<[T]> {
     pub fn get_mut(&mut self) -> Option<&mut [T]> {
         match &mut self.inner {
             Inner::Static(_) => None,
-            Inner::Arc(arc) => Arc::get_mut(arc)
-                .map(|slice| &mut slice[self.offset..self.offset + self.len]),
+            Inner::Arc(arc) => {
+                Arc::get_mut(arc).map(|slice| &mut slice[self.offset..self.offset + self.len])
+            }
         }
     }
 
@@ -200,8 +201,14 @@ impl FigBuf<str> {
 
         assert!(start <= end, "slice start must be <= end");
         assert!(end <= self.len, "slice end out of bounds");
-        assert!(self.as_str().is_char_boundary(start), "slice start not at char boundary");
-        assert!(self.as_str().is_char_boundary(end), "slice end not at char boundary");
+        assert!(
+            self.as_str().is_char_boundary(start),
+            "slice start not at char boundary"
+        );
+        assert!(
+            self.as_str().is_char_boundary(end),
+            "slice end not at char boundary"
+        );
 
         Self {
             inner: self.inner.clone(),
