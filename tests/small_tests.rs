@@ -136,7 +136,7 @@ fn test_small_buf_into_figbuf() {
 
 #[test]
 fn test_small_str_inline() {
-    let s: SmallFigStr<32> = SmallFigStr::from_str("hello world");
+    let s: SmallFigStr<32> = SmallFigStr::from("hello world");
 
     assert!(s.is_inline());
     assert_eq!(s.len(), 11);
@@ -146,7 +146,7 @@ fn test_small_str_inline() {
 #[test]
 fn test_small_str_heap() {
     let long_str = "a".repeat(100);
-    let s: SmallFigStr<32> = SmallFigStr::from_str(&long_str);
+    let s: SmallFigStr<32> = SmallFigStr::from(long_str.as_str());
 
     assert!(!s.is_inline());
     assert_eq!(s.len(), 100);
@@ -154,7 +154,7 @@ fn test_small_str_heap() {
 
 #[test]
 fn test_small_str_unicode() {
-    let s: SmallFigStr<32> = SmallFigStr::from_str("Hello, 世界!");
+    let s: SmallFigStr<32> = SmallFigStr::from("Hello, 世界!");
 
     assert!(s.is_inline());
     assert_eq!(&*s, "Hello, 世界!");
@@ -162,7 +162,7 @@ fn test_small_str_unicode() {
 
 #[test]
 fn test_small_str_slice() {
-    let s: SmallFigStr<32> = SmallFigStr::from_str("The quick brown fox");
+    let s: SmallFigStr<32> = SmallFigStr::from("The quick brown fox");
 
     let the = s.slice(0..3);
     assert_eq!(&*the, "The");
@@ -175,7 +175,7 @@ fn test_small_str_slice() {
 
 #[test]
 fn test_small_str_slice_unicode() {
-    let s: SmallFigStr<32> = SmallFigStr::from_str("Hello, 世界!");
+    let s: SmallFigStr<32> = SmallFigStr::from("Hello, 世界!");
 
     let hello = s.slice(0..7);
     assert_eq!(&*hello, "Hello, ");
@@ -187,13 +187,13 @@ fn test_small_str_slice_unicode() {
 #[test]
 #[should_panic(expected = "slice start not at char boundary")]
 fn test_small_str_invalid_boundary() {
-    let s: SmallFigStr<32> = SmallFigStr::from_str("世界");
+    let s: SmallFigStr<32> = SmallFigStr::from("世界");
     let _ = s.slice(1..3); 
 }
 
 #[test]
 fn test_small_str_clone() {
-    let s1: SmallFigStr<32> = SmallFigStr::from_str("test");
+    let s1: SmallFigStr<32> = SmallFigStr::from("test");
     let s2 = s1.clone();
 
     assert_eq!(s1, s2);
@@ -203,9 +203,9 @@ fn test_small_str_clone() {
 
 #[test]
 fn test_small_str_equality() {
-    let s1: SmallFigStr<32> = SmallFigStr::from_str("test");
-    let s2: SmallFigStr<32> = SmallFigStr::from_str("test");
-    let s3: SmallFigStr<32> = SmallFigStr::from_str("different");
+    let s1: SmallFigStr<32> = SmallFigStr::from("test");
+    let s2: SmallFigStr<32> = SmallFigStr::from("test");
+    let s3: SmallFigStr<32> = SmallFigStr::from("different");
 
     assert_eq!(s1, s2);
     assert_ne!(s1, s3);

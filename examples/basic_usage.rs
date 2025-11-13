@@ -34,7 +34,7 @@ fn main() {
     println!("Second slice: {:?}", slice2);
     println!("Reference count after slicing: {}", buf.ref_count());
 
-    let clone = buf.clone();
+    let _clone = buf.clone();
     println!("\nReference count after cloning: {}", buf.ref_count());
 
     let nested = slice1.slice(1..4);

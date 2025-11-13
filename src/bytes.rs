@@ -196,6 +196,12 @@ impl PartialEq<&[u8]> for Bytes {
     }
 }
 
+impl PartialEq<Bytes> for &[u8] {
+    fn eq(&self, other: &Bytes) -> bool {
+        *self == other.as_slice()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

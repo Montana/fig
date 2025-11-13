@@ -273,6 +273,12 @@ impl<const N: usize> PartialEq<&[u8]> for SmallFigBuf<N> {
     }
 }
 
+impl<const N: usize, const M: usize> PartialEq<&[u8; M]> for SmallFigBuf<N> {
+    fn eq(&self, other: &&[u8; M]) -> bool {
+        self.as_slice() == &other[..]
+    }
+}
+
 impl<const N: usize> From<Vec<u8>> for SmallFigBuf<N> {
     fn from(vec: Vec<u8>) -> Self {
         Self::from_vec(vec)
