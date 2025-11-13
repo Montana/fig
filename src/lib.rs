@@ -219,6 +219,17 @@ impl FigBuf<str> {
         &full_str[self.offset..self.offset + self.len]
     }
 
+    /// Returns the number of references to the underlying data.
+    ///
+    /// For static strings, this always returns `usize::MAX` to indicate
+    /// the data is effectively immortal.
+    pub fn ref_count(&self) -> usize {
+        match &self.inner {
+            Inner::Static(_) => usize::MAX,
+            Inner::Arc(arc) => Arc::strong_count(arc),
+        }
+    }
+
     /// Returns `true` if this `FigBuf` is backed by a static string.
     pub fn is_static(&self) -> bool {
         matches!(&self.inner, Inner::Static(_))
