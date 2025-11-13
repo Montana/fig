@@ -429,6 +429,12 @@ impl<const N: usize> PartialEq<&str> for SmallFigStr<N> {
     }
 }
 
+impl<const N: usize> PartialEq<&&str> for SmallFigStr<N> {
+    fn eq(&self, other: &&&str) -> bool {
+        self.as_str() == **other
+    }
+}
+
 impl<const N: usize> From<&str> for SmallFigStr<N> {
     fn from(s: &str) -> Self {
         Self {

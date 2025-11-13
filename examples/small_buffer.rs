@@ -42,16 +42,16 @@ fn main() {
     println!("\n=== SmallFigStr Examples ===\n");
 
     println!("--- Short Strings (Inline) ---");
-    let short_str: SmallFigStr<32> = SmallFigStr::from_str("Rust");
+    let short_str: SmallFigStr<32> = SmallFigStr::from("Rust");
     println!("String: '{}'", short_str);
     println!("Is inline: {}", short_str.is_inline());
 
-    let emoji: SmallFigStr<32> = SmallFigStr::from_str("Hello 👋 World 🌍");
+    let emoji: SmallFigStr<32> = SmallFigStr::from("Hello 👋 World 🌍");
     println!("\nUnicode: '{}'", emoji);
     println!("Length (bytes): {}", emoji.len());
     println!("Is inline: {}", emoji.is_inline());
 
-    let text: SmallFigStr<64> = SmallFigStr::from_str("The quick brown fox jumps");
+    let text: SmallFigStr<64> = SmallFigStr::from("The quick brown fox jumps");
     let quick = text.slice(4..9);
     println!("\nOriginal: '{}'", text);
     println!("Sliced: '{}'", quick);
@@ -59,7 +59,7 @@ fn main() {
 
     println!("\n--- Long Strings (Heap) ---");
     let long = "a".repeat(100);
-    let long_str: SmallFigStr<32> = SmallFigStr::from_str(&long);
+    let long_str: SmallFigStr<32> = SmallFigStr::from(&long);
     println!("String length: {}", long_str.len());
     println!("Is inline: {}", long_str.is_inline());
 
@@ -80,11 +80,11 @@ fn main() {
     println!("\n=== Practical Use Case: Config Strings ===\n");
 
     let configs: Vec<SmallFigStr<32>> = vec![
-        SmallFigStr::from_str("localhost"),
-        SmallFigStr::from_str("127.0.0.1"),
-        SmallFigStr::from_str("production"),
-        SmallFigStr::from_str("debug"),
-        SmallFigStr::from_str("/var/log/app.log"),
+        SmallFigStr::from("localhost"),
+        SmallFigStr::from("127.0.0.1"),
+        SmallFigStr::from("production"),
+        SmallFigStr::from("debug"),
+        SmallFigStr::from("/var/log/app.log"),
     ];
 
     println!("Configuration strings stored:");
