@@ -6,7 +6,6 @@ pub mod bytes;
 pub mod small;
 
 enum Inner<T: ?Sized + 'static> {
-
     Static(&'static T),
 
     Arc(Arc<T>),
@@ -28,7 +27,6 @@ pub struct FigBuf<T: ?Sized + 'static> {
 }
 
 impl<T: 'static> FigBuf<[T]> {
-
     pub fn from_vec(vec: Vec<T>) -> Self {
         let len = vec.len();
         Self {
@@ -116,7 +114,6 @@ impl<T: 'static> FigBuf<[T]> {
         let needs_clone = match &self.inner {
             Inner::Static(_) => true,
             Inner::Arc(arc) => {
-                
                 self.offset != 0 || self.len != arc.len() || Arc::strong_count(arc) > 1
             }
         };
@@ -146,9 +143,9 @@ impl FigBuf<str> {
         let bytes = FigBuf::from_vec(s.into_bytes());
         Self {
             inner: match bytes.inner {
-                Inner::Arc(arc) => Inner::Arc(unsafe {
-                    Arc::from_raw(Arc::into_raw(arc) as *const str)
-                }),
+                Inner::Arc(arc) => {
+                    Inner::Arc(unsafe { Arc::from_raw(Arc::into_raw(arc) as *const str) })
+                }
                 Inner::Static(_) => unreachable!("from_vec never returns Static"),
             },
             offset: 0,
@@ -223,14 +220,11 @@ impl FigBuf<str> {
     pub fn try_mut(&mut self) -> Option<&mut str> {
         match &mut self.inner {
             Inner::Static(_) => None,
-            Inner::Arc(arc) => {
-
-                Arc::get_mut(arc).map(|s| unsafe {
-                    let bytes = s.as_bytes_mut();
-                    let slice = &mut bytes[self.offset..self.offset + self.len];
-                    std::str::from_utf8_unchecked_mut(slice)
-                })
-            }
+            Inner::Arc(arc) => Arc::get_mut(arc).map(|s| unsafe {
+                let bytes = s.as_bytes_mut();
+                let slice = &mut bytes[self.offset..self.offset + self.len];
+                std::str::from_utf8_unchecked_mut(slice)
+            }),
         }
     }
 
