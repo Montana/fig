@@ -13,7 +13,7 @@ enum Inner<T: ?Sized + 'static> {
     Arc(Arc<T>),
 }
 
-impl<T: ?Sized> Clone for Inner<T> {
+impl<T: ?Sized + 'static> Clone for Inner<T> {
     fn clone(&self) -> Self {
         match self {
             Inner::Static(s) => Inner::Static(s),
@@ -30,13 +30,13 @@ impl<T: ?Sized> Clone for Inner<T> {
 ///
 /// Static slices are stored without heap allocation, providing zero-cost
 /// abstraction for compile-time known data.
-pub struct FigBuf<T: ?Sized> {
+pub struct FigBuf<T: ?Sized + 'static> {
     inner: Inner<T>,
     offset: usize,
     len: usize,
 }
 
-impl<T> FigBuf<[T]> {
+impl<T: 'static> FigBuf<[T]> {
     /// Creates a new `FigBuf` from a vector.
     pub fn from_vec(vec: Vec<T>) -> Self {
         let len = vec.len();
@@ -225,7 +225,7 @@ impl FigBuf<str> {
     }
 }
 
-impl<T> Clone for FigBuf<[T]> {
+impl<T: 'static> Clone for FigBuf<[T]> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -245,7 +245,7 @@ impl Clone for FigBuf<str> {
     }
 }
 
-impl<T> Deref for FigBuf<[T]> {
+impl<T: 'static> Deref for FigBuf<[T]> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -261,7 +261,7 @@ impl Deref for FigBuf<str> {
     }
 }
 
-impl<T> AsRef<[T]> for FigBuf<[T]> {
+impl<T: 'static> AsRef<[T]> for FigBuf<[T]> {
     fn as_ref(&self) -> &[T] {
         self.as_slice()
     }
@@ -273,7 +273,7 @@ impl AsRef<str> for FigBuf<str> {
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for FigBuf<[T]> {
+impl<T: fmt::Debug + 'static> fmt::Debug for FigBuf<[T]> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(self.as_slice(), f)
     }
@@ -285,7 +285,7 @@ impl fmt::Debug for FigBuf<str> {
     }
 }
 
-impl<T: fmt::Display> fmt::Display for FigBuf<[T]> {
+impl<T: fmt::Display + 'static> fmt::Display for FigBuf<[T]> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[")?;
         for (i, item) in self.as_slice().iter().enumerate() {
@@ -304,13 +304,13 @@ impl fmt::Display for FigBuf<str> {
     }
 }
 
-impl<T> From<Vec<T>> for FigBuf<[T]> {
+impl<T: 'static> From<Vec<T>> for FigBuf<[T]> {
     fn from(vec: Vec<T>) -> Self {
         Self::from_vec(vec)
     }
 }
 
-impl<T> From<Box<[T]>> for FigBuf<[T]> {
+impl<T: 'static> From<Box<[T]>> for FigBuf<[T]> {
     fn from(slice: Box<[T]>) -> Self {
         Self::from_boxed_slice(slice)
     }
@@ -322,7 +322,7 @@ impl From<String> for FigBuf<str> {
     }
 }
 
-impl<'a, T: Clone> From<&'a [T]> for FigBuf<[T]> {
+impl<'a, T: Clone + 'static> From<&'a [T]> for FigBuf<[T]> {
     fn from(slice: &'a [T]) -> Self {
         Self::from_vec(slice.to_vec())
     }
