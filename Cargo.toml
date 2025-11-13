@@ -1,0 +1,21 @@
+[package]
+name = "fig"
+version = "0.1.0"
+edition = "2021"
+authors = ["Michael Mendy <montana@linux.com>"]
+description = "library for managing shared slices of memory with reference counting"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = [
+  "buffers",
+  "io",
+]
+
+[dependencies]
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "figbuf_bench"
+harness = false
